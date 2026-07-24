@@ -1,0 +1,32 @@
+name: 喝水提醒
+
+on:
+  # 手动触发：可指定提醒级别（1-7）进行测试
+  workflow_dispatch:
+    inputs:
+      level:
+        description: '提醒级别 (1-7)，留空默认发第 1 条'
+        required: false
+        type: string
+
+  # 定时触发：工作日 cron 覆盖北京时间 8:00-18:55，脚本内部精确匹配 7 个时间点
+  # 分钟列表含 55 以覆盖 12:55（UTC 4:55）
+  schedule:
+    - cron: '0,10,20,30,40,50,55 0-10 * * 1-5'
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 发送喝水提醒
+        env:
+          WECOM_WEBHOOK_URL: ${{ secrets.WECOM_WEBHOOK_URL }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 send.py --test ${{ inputs.level || '1' }}
+          else
+            python3 send.py
+          fi
