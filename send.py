@@ -61,16 +61,36 @@ def main():
         print(f"[OK] {result}")
         return
 
-    # 匹配当前时间到 schedule 中的某个提醒
     schedule = config.get("schedule", [])
-    matched = None
-    for entry in schedule:
-        if entry["time"] == now_hhmm:
-            matched = entry
-            break
+
+    # --force 模式：跳过时间检查，直接发送下一个 scheduled 提醒（用于手动测试）
+    if "--force" in sys.argv:
+        matched = schedule[0]  # 默认发第一条
+        # 找到当前时间之后最近的 schedule 条目
+        for entry in schedule:
+            if entry["time"] >= now_hhmm:
+                matched = entry
+                break
+        print(f"[FORCE] 跳过时间检查，发送 Level {matched['level']} 提醒")
+    else:
+        # 正常模式：精确匹配或 5 分钟窗口容错
+        matched = None
+        for entry in schedule:
+            if entry["time"] == now_hhmm:
+                matched = entry
+                break
+        # 容错：如果精确匹配失败，检查 5 分钟窗口内是否有匹配
+        if not matched:
+            now_minutes = now.hour * 60 + now.minute
+            for entry in schedule:
+                h, m = map(int, entry["time"].split(":"))
+                entry_minutes = h * 60 + m
+                if abs(now_minutes - entry_minutes) <= 5:
+                    matched = entry
+                    print(f"[WINDOW] {now_hhmm} 匹配到 {entry['time']}（5分钟窗口）")
+                    break
 
     if not matched:
-        # 不是提醒时间，静默退出（GitHub Actions 每 10 分钟触发一次检查）
         print(f"[SKIP] {now_hhmm} - 不在提醒时间表")
         return
 
